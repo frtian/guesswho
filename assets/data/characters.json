@@ -1,0 +1,14 @@
+{
+  "characters": [
+    {
+      "id": 1,
+      "name": "Alex",
+      "texture_path": "textures/faces/alex.png"
+    },
+    {
+      "id": 2,
+      "name": "Sam",
+      "texture_path": "textures/faces/sam.png"
+    }
+  ]
+}
