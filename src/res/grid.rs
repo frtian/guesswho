@@ -1,14 +1,14 @@
 // grid.rs
 use bevy::prelude::*;
+use super::common::*;
 
-#[derive(Component, Debug)]
+#[derive(Component)]
 pub struct GridCell {
     pub logical_x: usize, // Índice da coluna (0..cols)
     pub logical_y: usize, // Índice da linha (0..rows)
-    pub id: u16,
+    pub id: ID,
 }
 
-// Marker para facilitar query
 #[derive(Component)]
 pub struct GridRoot; 
 
@@ -18,7 +18,7 @@ pub fn render_cell(
     size: f32,
     logical_x: usize,
     logical_y: usize,
-    id: u16,
+    id: ID,
 ) {
     commands.spawn((
         Sprite {

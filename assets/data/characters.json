@@ -1,0 +1,19 @@
+{
+  "characters": [
+    {
+      "id": 1,
+      "name": "Torres Gêmeas",
+      "texture_path": "textures/faces/twintowers.jpg"
+    },
+    {
+      "id": 2,
+      "name": "Epstein",
+      "texture_path": "textures/faces/epstein.png"
+    },
+    {
+      "id": 3,
+      "name": "Homem de Preto",
+      "texture_path": "textures/faces/blackman.png"
+    }
+  ]
+}
