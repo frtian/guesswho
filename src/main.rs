@@ -1,12 +1,16 @@
-// main.rs
-mod implementation;
-use implementation::grid::*;
-use implementation::common::*;
-use implementation::chars::*;
-use bevy::prelude::*;
+#![allow(unused)]
+mod res;
 use bevy::window::PrimaryWindow;
+use crate::res::common::Colors;
+use bevy::asset::LoadState;
+use res::ui::spawn_button;
+use bevy::prelude::*;
+use res::common::*;
+use res::chars::*;
+use res::card::*;
+use res::grid::*;
 
-const CELL_SIZE: f32 = 80.0;
+const CELL_SIZE: f32 = 120.0;
 const GRID_PADDING: f32 = 5.0;
 const GRID_COLS: usize = 4;
 const GRID_ROWS: usize = 4;
@@ -14,16 +18,22 @@ const GRID_ROWS: usize = 4;
 #[derive(States, Debug, Clone, Copy, Eq, PartialEq, Hash, Default)]
 enum GameState {
     #[default]
+    Title,
     Loading,
     Playing,
+    Lobby,
+    InGame,
 }
+
+#[derive(Component)]
+pub struct TitleScreenRoot;
 
 fn main() {
     let mut app = App::new();
     app.add_plugins(DefaultPlugins.set(WindowPlugin {
         primary_window: Some(Window {
             title: "Guess Who - Bevy".to_string(),
-            resolution: (680, 400).into(),
+            resolution: (1366, 768).into(),
             ..Default::default()
         }),
         ..Default::default()
@@ -31,8 +41,12 @@ fn main() {
     app.add_plugins(CharacterDataPlugin);
     app.init_state::<GameState>();
     app.add_systems(Startup, (setup_camera, initialize_game_seed));
+    app.add_systems(OnEnter(GameState::Title), spawn_title_screen);
     app.add_systems(Startup, start_loading);
-    app.add_systems(Update, check_loading_status.run_if(in_state(GameState::Loading)));
+    app.add_systems(
+        Update,
+        check_loading_status.run_if(in_state(GameState::Loading)),
+    );
     app.add_systems(Update, (handle_mouse_hover, handle_keyboard_input));
     app.add_systems(OnEnter(GameState::Playing), spawn_grid);
     app.run();
@@ -45,6 +59,62 @@ fn start_loading(
 ) {
     // Inicia o carregamento assíncrono. O Bevy vai ler o arquivo em background.
     char_handle.0 = asset_server.load("data/characters.json");
+}
+
+fn spawn_title_screen(mut commands: Commands, asset_server: Res<AssetServer>) {
+    let hero_img: Handle<Image> = asset_server.load("textures/ui/hero.png");
+    // Criar uma tela de título com um botão de host e join
+    commands
+        .spawn((
+            TitleScreenRoot,
+            Node {
+                display: Display::Grid,
+                grid_template_rows: vec![GridTrack::percent(70.0), GridTrack::percent(30.0)],
+                align_items: AlignItems::Start,
+                justify_content: JustifyContent::Center,
+                row_gap: Val::Px(60.0),
+                height: Val::Percent(100.0),
+                width: Val::Percent(100.0),
+                ..Default::default()
+            },
+            BackgroundColor(Color::NONE),
+        ))
+        .with_children(|parent| {
+            // Imagem Hero
+            parent.spawn((
+                ImageNode {
+                    image: hero_img.clone().into(),
+                    image_mode: NodeImageMode::Auto,
+                    ..Default::default()
+                },
+                Node {
+                    width: Val::Px(600.0),
+                    height: Val::Px(600.0),
+                    margin: UiRect {
+                        bottom: Val::Px(120.0),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            ));
+            // Botão Host
+            parent
+                .spawn((Node {
+                    display: Display::Grid,
+                    align_items: AlignItems::Start,
+                    justify_content: JustifyContent::Center,
+                    grid_template_rows: vec![GridTrack::auto(), GridTrack::auto()],
+                    row_gap: Val::Px(20.0),
+                    ..Default::default()
+                },))
+                .with_children(|grid| {
+                    // Botão Host
+                    spawn_button(grid, "Host Game", 200.0, 50.0, Colors::DARK_GRAY);
+
+                    // Botão Join
+                    spawn_button(grid, "Join Game", 200.0, 50.0, Colors::DARK_GRAY);
+                });
+        });
 }
 
 fn check_loading_status(
@@ -63,7 +133,7 @@ fn setup_camera(mut commands: Commands) {
     commands.spawn(Camera2d::default());
 }
 
-fn spawn_grid(mut commands: Commands) {
+fn spawn_grid(mut commands: Commands, character_assets: Res<Assets<CharacterCollectionAsset>>) {
     let total_width = (GRID_COLS as f32) * (CELL_SIZE + GRID_PADDING) - GRID_PADDING;
     let total_height = (GRID_ROWS as f32) * (CELL_SIZE + GRID_PADDING) - GRID_PADDING;
 
@@ -89,7 +159,8 @@ fn spawn_grid(mut commands: Commands) {
 fn handle_keyboard_input(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     game_seed: Option<ResMut<GameSeed>>,
-    commands: Commands,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
 ) {
     if keyboard_input.just_pressed(KeyCode::KeyR) {
         println!("R pressed - regenerating game seed");
@@ -98,25 +169,46 @@ fn handle_keyboard_input(
         }
         let seed: u64 = gen_game_seed();
         update_game_seed(commands, game_seed, seed);
+    } else if keyboard_input.just_pressed(KeyCode::KeyT) {
+        // criar uma carta de teste
+        println!("T pressed - spawning test card");
+        let face_handle: Handle<Image> = asset_server.load("textures/faces/twintowers.png");
+        commands.spawn(CardBundle {
+            sprite: Sprite {
+                color: Color::WHITE,
+                image: face_handle.clone(),
+                custom_size: Some(Vec2::splat(CELL_SIZE)),
+                ..Default::default()
+            },
+            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 1.0)),
+            card: Card {
+                is_flipped: true,
+                is_eliminated: false,
+            },
+            face: CardFace(face_handle),
+            id: ID(999),
+            name: Name("Test Card".to_string()),
+        });
     }
 }
 
 fn handle_mouse_hover(
     q_camera: Query<(&Camera, &GlobalTransform)>,
     q_window: Query<&Window, With<PrimaryWindow>>,
-    mut q_cells: Query<(&Transform, &mut Sprite, &GridCell)>, 
+    mut q_cells: Query<(&Transform, &mut Sprite, &GridCell)>,
 ) {
     let (camera, cam_transform): (&Camera, &GlobalTransform) = q_camera.single().unwrap();
 
     let window: &Window = q_window.single().unwrap();
 
     // 2. Obter posição do cursor
-    if let Some(cursor_position) = window.cursor_position()
-        .and_then(|cursor| camera.viewport_to_world_2d(cam_transform, cursor).ok()) 
+    if let Some(cursor_position) = window
+        .cursor_position()
+        .and_then(|cursor| camera.viewport_to_world_2d(cam_transform, cursor).ok())
     {
         // 3. Checar colisão
         for (transform, mut sprite, _cell) in q_cells.iter_mut() {
-            let position = transform.translation.truncate(); 
+            let position = transform.translation.truncate();
             let half_size = CELL_SIZE / 2.0;
 
             let is_hovering = cursor_position.x > position.x - half_size
