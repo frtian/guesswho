@@ -42,7 +42,6 @@ pub fn update_card_visuals(
              sprite.color = Color::WHITE;
         } else {
             sprite.image = assets.back_image.clone(); // Mostra o verso
-            
             // Opcional: Escurecer se estiver eliminada
             if card.is_eliminated {
                  sprite.color = Color::srgb(0.5, 0.5, 0.5); 

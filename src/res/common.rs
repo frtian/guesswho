@@ -1,6 +1,14 @@
 use bevy::prelude::*;
 use rand::{Rng, RngCore};
 
+// COMMON COLORS
+pub struct Colors;
+impl Colors {
+    pub const PRESSED: Color = Color::srgb(0.1, 0.1, 0.1);
+    pub const DARK_GRAY: Color = Color::srgb(0.2, 0.2, 0.2);
+    pub const LIGHT_GRAY: Color = Color::srgb(0.8, 0.8, 0.8);
+}
+
 // COMMMON COMPONENTS
 #[derive(Component)]
 pub struct ID(pub u16);
