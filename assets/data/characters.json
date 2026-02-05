@@ -2,13 +2,18 @@
   "characters": [
     {
       "id": 1,
-      "name": "Alex",
-      "texture_path": "textures/faces/alex.png"
+      "name": "Torres Gêmeas",
+      "texture_path": "textures/faces/twintowers.jpg"
     },
     {
       "id": 2,
-      "name": "Sam",
-      "texture_path": "textures/faces/sam.png"
+      "name": "Epstein",
+      "texture_path": "textures/faces/epstein.png"
+    },
+    {
+      "id": 3,
+      "name": "Homem de Preto",
+      "texture_path": "textures/faces/blackman.png"
     }
   ]
 }
