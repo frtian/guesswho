@@ -1,10 +1,14 @@
 #![allow(unused)]
 mod res;
+use bevy::input_focus::InputFocus;
 use bevy::window::PrimaryWindow;
 use crate::res::common::Colors;
+use bevy::ecs::event::Trigger;
 use bevy::asset::LoadState;
-use res::ui::spawn_button;
+use bevy::state::commands;
+use crate::res::ui::*;
 use bevy::prelude::*;
+use bevy::ecs::world;
 use res::common::*;
 use res::chars::*;
 use res::card::*;
@@ -14,19 +18,6 @@ const CELL_SIZE: f32 = 120.0;
 const GRID_PADDING: f32 = 5.0;
 const GRID_COLS: usize = 4;
 const GRID_ROWS: usize = 4;
-
-#[derive(States, Debug, Clone, Copy, Eq, PartialEq, Hash, Default)]
-enum GameState {
-    #[default]
-    Title,
-    Loading,
-    Playing,
-    Lobby,
-    InGame,
-}
-
-#[derive(Component)]
-pub struct TitleScreenRoot;
 
 fn main() {
     let mut app = App::new();
@@ -40,14 +31,27 @@ fn main() {
     }));
     app.add_plugins(CharacterDataPlugin);
     app.init_state::<GameState>();
-    app.add_systems(Startup, (setup_camera, initialize_game_seed));
+    app.init_resource::<InputFocus>();
+    app.init_resource::<GameSeed>();
+    app.insert_resource(ClearColor(Color::srgb(0.09, 0.09, 0.09)));
+    app.add_systems(Startup, (setup_camera, initialize_rng));
     app.add_systems(OnEnter(GameState::Title), spawn_title_screen);
+    app.add_systems(OnExit(GameState::Title), despawn_title_screen);
+    app.add_systems(OnEnter(GameState::Lobby), spawn_lobby_for_host);
     app.add_systems(Startup, start_loading);
     app.add_systems(
         Update,
         check_loading_status.run_if(in_state(GameState::Loading)),
     );
-    app.add_systems(Update, (handle_mouse_hover, handle_keyboard_input));
+    app.add_systems(
+        Update,
+        (
+            handle_mouse_hover,
+            handle_keyboard_input,
+            button_behavior_system,
+            sync_rng_with_seed
+        ),
+    );
     app.add_systems(OnEnter(GameState::Playing), spawn_grid);
     app.run();
 }
@@ -59,62 +63,6 @@ fn start_loading(
 ) {
     // Inicia o carregamento assíncrono. O Bevy vai ler o arquivo em background.
     char_handle.0 = asset_server.load("data/characters.json");
-}
-
-fn spawn_title_screen(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let hero_img: Handle<Image> = asset_server.load("textures/ui/hero.png");
-    // Criar uma tela de título com um botão de host e join
-    commands
-        .spawn((
-            TitleScreenRoot,
-            Node {
-                display: Display::Grid,
-                grid_template_rows: vec![GridTrack::percent(70.0), GridTrack::percent(30.0)],
-                align_items: AlignItems::Start,
-                justify_content: JustifyContent::Center,
-                row_gap: Val::Px(60.0),
-                height: Val::Percent(100.0),
-                width: Val::Percent(100.0),
-                ..Default::default()
-            },
-            BackgroundColor(Color::NONE),
-        ))
-        .with_children(|parent| {
-            // Imagem Hero
-            parent.spawn((
-                ImageNode {
-                    image: hero_img.clone().into(),
-                    image_mode: NodeImageMode::Auto,
-                    ..Default::default()
-                },
-                Node {
-                    width: Val::Px(600.0),
-                    height: Val::Px(600.0),
-                    margin: UiRect {
-                        bottom: Val::Px(120.0),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                },
-            ));
-            // Botão Host
-            parent
-                .spawn((Node {
-                    display: Display::Grid,
-                    align_items: AlignItems::Start,
-                    justify_content: JustifyContent::Center,
-                    grid_template_rows: vec![GridTrack::auto(), GridTrack::auto()],
-                    row_gap: Val::Px(20.0),
-                    ..Default::default()
-                },))
-                .with_children(|grid| {
-                    // Botão Host
-                    spawn_button(grid, "Host Game", 200.0, 50.0, Colors::DARK_GRAY);
-
-                    // Botão Join
-                    spawn_button(grid, "Join Game", 200.0, 50.0, Colors::DARK_GRAY);
-                });
-        });
 }
 
 fn check_loading_status(
@@ -130,7 +78,7 @@ fn check_loading_status(
 }
 
 fn setup_camera(mut commands: Commands) {
-    commands.spawn(Camera2d::default());
+    commands.spawn(Camera2d);
 }
 
 fn spawn_grid(mut commands: Commands, character_assets: Res<Assets<CharacterCollectionAsset>>) {
@@ -158,17 +106,17 @@ fn spawn_grid(mut commands: Commands, character_assets: Res<Assets<CharacterColl
 
 fn handle_keyboard_input(
     keyboard_input: Res<ButtonInput<KeyCode>>,
-    game_seed: Option<ResMut<GameSeed>>,
+    mut game_seed: Option<ResMut<GameSeed>>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
     if keyboard_input.just_pressed(KeyCode::KeyR) {
         println!("R pressed - regenerating game seed");
         if let Some(ref seed) = game_seed {
-            println!("Game Seed: {}", seed.seed);
+            println!("Game Seed: {}", seed.0);
         }
-        let seed: u64 = gen_game_seed();
-        update_game_seed(commands, game_seed, seed);
+        let seed = rand::random::<u64>();
+        game_seed.unwrap().0 = seed;
     } else if keyboard_input.just_pressed(KeyCode::KeyT) {
         // criar uma carta de teste
         println!("T pressed - spawning test card");
